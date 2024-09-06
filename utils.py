@@ -37,5 +37,18 @@ def structured_output_parser(response_schemas):
         text += schema.name + ' 字段，表示：' + schema.description + '，类型为：' + schema.type + '\n'
     return text
 
+# GRAPH_TEMPLATE中%key%替换为真实值
+def replace_token_in_string(string, slots):
+    for key, value in slots:
+        string = string.replace('%'+key+'%', value)
+    return string
+
+# 连接Neo4j
+def get_neo4j_con():
+    return Graph(
+        os.getenv('NEO4J_URI'), 
+        auth = (os.getenv('NEO4J_USERNAME'), os.getenv('NEO4J_PASSWORD'))
+    )
+
 # llm_model = get_llm_model()
 # print(llm_model.invoke("你是谁").content)

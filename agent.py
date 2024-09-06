@@ -62,10 +62,57 @@ class Agent():
         llm = get_llm_model()
         ner_chain = ner_prompt | llm | output_parser
         ner_result = ner_chain.invoke({"query": query})
-        return ner_result
+
+        # 用实体识别结果填充模板
+        kg_templates = []
+        for key, template in KG_TEMPLATE.items():
+            slot = template['slots'][0]
+            slot_values = ner_result[slot]
+            for value in slot_values:
+                kg_templates.append({
+                    'question': replace_token_in_string(template['question'], [[slot, value]]),
+                    'cypher': replace_token_in_string(template['cypher'], [[slot, value]]),
+                    'answer': replace_token_in_string(template['answer'], [[slot, value]]),
+                })
+        if not kg_templates:
+            return 
+        # 计算问题相似度，筛选最相关的3个问题
+        kg_documents = [
+            Document(page_content=template['question'], metadata=template) for template in kg_templates
+        ]
+        db = FAISS.from_documents(kg_documents, get_embedding_model())
+        kg_documents_filter = db.similarity_search_with_relevance_scores(query, k=3)
+
+        # Neo4j拿到数据，把查询到的结果作为上下文信息，给到大模型进行总结
+        # 执行CQL
+        query_result = []
+        neo4j_con = get_neo4j_con()
+
+        for document in kg_documents_filter:
+            question = document[0].page_content
+            cypher = document[0].metadata['cypher']
+            answer = document[0].metadata['answer']
+            try:
+                result = neo4j_con.run(cypher).data()
+                if result and any(value for value in result[0].values()):
+                    answer_str = replace_token_in_string(answer, list(result[0].items()))
+                    query_result.append(f'问题：{question}\n答案：{answer_str}')
+            except:
+                pass
+        # 根据查询结果，llm总结答案
+        prompt = PromptTemplate.from_template(KG_PROMPT_TPL)
+        llm = get_llm_model()
+        kg_chain = prompt | llm
+        inputs = {
+            "query": query,
+            "query_result": '\n\n'.join(query_result) if len(query_result) else "没有查到相关内容"
+        }
+        kg_result = kg_chain.invoke(inputs)
+        return kg_result
 
     
 agent = Agent()
 # print(agent.general_func("你是谁?"))
 # print(agent.retrival_func("寻医问药网是什么？"))
-print(agent.ner_func('感冒吃什么药好得快？可以吃阿莫西林吗？'))
+# print(agent.ner_func('感冒吃什么药好得快？可以吃阿莫西林吗？'))
+print(agent.ner_func('感冒和鼻炎是并发症嘛？'))
