@@ -1,4 +1,4 @@
-from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
 
 from py2neo import Graph
