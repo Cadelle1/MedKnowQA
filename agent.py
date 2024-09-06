@@ -109,10 +109,24 @@ class Agent():
         }
         kg_result = kg_chain.invoke(inputs)
         return kg_result
-
+    
+    def search_func(self, query):
+        prompt = PromptTemplate.from_template(SEARCH_PROMPT_TPL)
+        llm = get_llm_model()
+        llm_chain = prompt | llm
+        llm_request_chain = LLMRequestsChain(
+            llm_chain = llm_chain,
+            requests_key = 'query_result'
+        )
+        inputs = {
+            "query": query,
+            "url": "https://www.google.com/search?q=" + query.replace(" ", "+")
+        }
+        return llm_request_chain.invoke(inputs)
     
 agent = Agent()
 # print(agent.general_func("你是谁?"))
 # print(agent.retrival_func("寻医问药网是什么？"))
 # print(agent.ner_func('感冒吃什么药好得快？可以吃阿莫西林吗？'))
 print(agent.ner_func('感冒和鼻炎是并发症嘛？'))
+# print(agent.search_func('刘渊琦是谁？'))

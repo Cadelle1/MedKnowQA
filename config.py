@@ -1,4 +1,4 @@
-GRAPH_TEMPLATE = {
+KG_TEMPLATE = {
     'desc': {
         'slots': ['disease'],
         'question': '什么叫%disease%? / %disease%是一种什么病？',
